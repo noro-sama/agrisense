@@ -13,8 +13,8 @@ const CROPS = [
 
 const WELCOME = [
   'Welcome to Agrisense!',
-  'Tap what you want to do, then tell me your crop and district.',
-  'I check the forecast and advise you. You make the final call.',
+  'Tap Plant for planting advice, or 📷 Crop health to check a sick plant.',
+  'You make the final call — I just advise.',
 ].join('\n');
 
 function normalize(text) {
@@ -68,10 +68,11 @@ const ACTIONS = [
   { action: 'plant', keywords: ['plant', 'planting', 'sow'] },
   { action: 'fertiliser', keywords: ['fertilis', 'fertiliz', 'top dress', 'urea', 'dap', 'manure'] },
   { action: 'till', keywords: ['till', 'tillage', 'plough', 'plow', 'ridge'] },
+  { action: 'crop-health', keywords: ['crop health', 'crop doctor', 'photo', 'picture', 'disease', 'sick'] },
 ];
 
 const ACTION_KEYBOARD = {
-  keyboard: [[{ text: 'Plant' }, { text: 'Apply fertiliser' }], [{ text: 'Till fields' }]],
+  keyboard: [[{ text: 'Plant' }, { text: '📷 Crop health' }]],
   resize_keyboard: true,
   one_time_keyboard: true,
 };
@@ -85,7 +86,29 @@ const DISTRICT_OFFER_KEYBOARD = {
   resize_keyboard: true,
   one_time_keyboard: true,
 };
-const ACTION_NOUNS = { plant: 'planting', fertiliser: 'fertiliser', till: 'tillage' };
+const ACTION_NOUNS = { plant: 'planting', fertiliser: 'fertiliser', till: 'tillage', 'crop-health': 'crop health' };
+const SUPPORTED_ACTIONS = ['plant', 'crop-health'];
+
+const CROP_HEALTH_INTRO = [
+  '📷 *Crop health check*',
+  'Send a clear photo of the affected plant. Close-ups of leaves work best.',
+  'I will look for signs of disease or pests and advise what to do.',
+].join('\n');
+
+const LANGUAGES = { bemba: 'Bemba', nyanja: 'Nyanja', tonga: 'Tonga', english: 'English' };
+const LANGUAGE_KEYBOARD = {
+  keyboard: [[{ text: 'Bemba' }, { text: 'Nyanja' }], [{ text: 'Tonga' }, { text: 'English' }]],
+  resize_keyboard: true,
+  one_time_keyboard: true,
+};
+
+function parseLanguage(text) {
+  const norm = normalize(text);
+  for (const lang of Object.keys(LANGUAGES)) {
+    if (new RegExp(`\\b${lang}\\b`).test(norm)) return lang;
+  }
+  return null;
+}
 
 // Word-boundary match so "still waiting" does not parse as tillage.
 function parseAction(text) {
@@ -108,9 +131,18 @@ function escapeMd(s) {
 
 function formatReply(decision, { district, crop, action, stale }) {
   const lines = [];
-  lines.push(`📍 *${escapeMd(cap(district.name))}, ${escapeMd(district.province)} - ${escapeMd(crop)} (${ACTION_NOUNS[action] || action})*`);
-  if (!district.matched) lines.push('_Default location used (Lusaka). Reply with your district._');
-  lines.push(`${decision.recommendation === 'WAIT' ? '⏳' : '✅'} *${decision.recommendation}* (${decision.confidence} confidence)`);
+  const noun = ACTION_NOUNS[action] || action;
+  if (district && crop) {
+    lines.push(`📍 *${escapeMd(cap(district.name))}, ${escapeMd(district.province)} - ${escapeMd(crop)} (${noun})*`);
+  } else if (district) {
+    lines.push(`📍 *${escapeMd(cap(district.name))}, ${escapeMd(district.province)} (${noun})*`);
+  } else if (crop) {
+    lines.push(`📷 *${escapeMd(crop)} (${noun})*`);
+  } else {
+    lines.push('📷 *Crop health check*');
+  }
+  if (district && !district.matched) lines.push('_Default location used (Lusaka). Reply with your district._');
+  lines.push(`${/^(WAIT|SUSPECT)$/.test(decision.recommendation) ? '⏳' : '✅'} *${decision.recommendation}* (${decision.confidence} confidence)`);
   lines.push(`🌧️ ${escapeMd(decision.reason_plain)}`);
   lines.push(`📅 *Timing:* ${escapeMd(decision.timing)}`);
   if (decision.risk_flags && decision.risk_flags.length) {
@@ -130,6 +162,7 @@ function formatReply(decision, { district, crop, action, stale }) {
 }
 
 module.exports = {
-  resolveDistrict, extractCrop, parseAction, formatReply, normalize, WELCOME,
-  ACTION_KEYBOARD, CROP_KEYBOARD, DISTRICT_OFFER_KEYBOARD,
+  resolveDistrict, extractCrop, parseAction, parseLanguage, formatReply, normalize, WELCOME, CROP_HEALTH_INTRO,
+  ACTION_KEYBOARD, CROP_KEYBOARD, DISTRICT_OFFER_KEYBOARD, LANGUAGE_KEYBOARD,
+  SUPPORTED_ACTIONS, LANGUAGES,
 };

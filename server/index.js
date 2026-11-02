@@ -5,11 +5,13 @@ const logger = require('./utils/logger');
 const { getDailyForecast } = require('./services/forecastService');
 const { getSoils, getDistricts } = require('./services/agriRigoService');
 const { computeFeatures, computeFertiliserFeatures, computeTillageFeatures } = require('./services/featureService');
-const { getPlantingDecision } = require('./services/aiService');
+const { getPlantingDecision, translateDecision, analyzeCropImage } = require('./services/aiService');
+const { pickPhotoId, fetchPhotoBase64 } = require('./services/cropHealthService');
 const { getState, updateState, resetState } = require('./services/conversationService');
 const {
-  resolveDistrict, extractCrop, parseAction, formatReply, normalize,
-  WELCOME, ACTION_KEYBOARD, CROP_KEYBOARD, DISTRICT_OFFER_KEYBOARD,
+  resolveDistrict, extractCrop, parseAction, parseLanguage, formatReply, normalize,
+  WELCOME, CROP_HEALTH_INTRO, ACTION_KEYBOARD, CROP_KEYBOARD, DISTRICT_OFFER_KEYBOARD, LANGUAGE_KEYBOARD,
+  SUPPORTED_ACTIONS, LANGUAGES,
 } = require('./services/telegramService');
 
 const app = express();
@@ -67,7 +69,11 @@ async function buildAdvisory(state) {
     forecast = await getDailyForecast(district.lat, district.lon);
   } catch (err) {
     logger.warn('telegram', 'weather unavailable, honest partial reply', { error: err.message });
-    return `Weather data is unavailable right now, so I cannot advise safely for ${district.name} ${crop}. Please try again shortly.`;
+    return {
+      text: `Weather data is unavailable right now, so I cannot advise safely for ${district.name} ${crop}. Please try again shortly.`,
+      decision: null,
+      stale: false,
+    };
   }
   sources.push(...forecast.sources_used);
   const features = computeFeaturesFor(action, forecast.daily, crop);
@@ -88,27 +94,48 @@ async function buildAdvisory(state) {
     : '';
 
   const decision = await getPlantingDecision({ action, features, cropKnowledge: '', soilData, droughtNote, sources_used: sources });
-  return formatReply(decision, { district, crop, action, stale: forecast.stale });
+  const shown = await translateDecision(decision, { district: district.name, crop, action }, state.language);
+  return {
+    text: formatReply(shown, { district, crop, action, stale: forecast.stale }),
+    decision,
+    stale: forecast.stale,
+  };
+}
+
+function ackPrefix(chatId) {
+  const s = getState(chatId);
+  if (s.langAck) {
+    updateState(chatId, { langAck: false });
+    return `Noted — I'll answer in ${LANGUAGES[s.language] || s.language}.\n\n`;
+  }
+  return '';
 }
 
 async function runIfReady(chatId, foundAny, lastText) {
-  const s = getState(chatId);
-  if (!s.action) return { text: 'What do you want to do?', options: { reply_markup: ACTION_KEYBOARD } };
-  if (!s.crop) return { text: 'Which crop?', options: { reply_markup: CROP_KEYBOARD } };
+  let s = getState(chatId);
+  if (!s.action) {
+    updateState(chatId, { action: 'plant' });
+    s = getState(chatId);
+  }
+  if (!s.crop) {
+    return { text: `${ackPrefix(chatId)}Which crop?`, options: { reply_markup: CROP_KEYBOARD } };
+  }
   if (!s.district) {
-    if (!foundAny && s.action && s.crop) {
+    if (!foundAny) {
       updateState(chatId, { awaitingDistrictConfirm: true });
       return {
-        text: `I couldn't find "${lastText}". Use Lusaka instead, or type another district?`,
+        text: `${ackPrefix(chatId)}I couldn't find "${lastText}". Use Lusaka instead, or type another district?`,
         options: { reply_markup: DISTRICT_OFFER_KEYBOARD },
       };
     }
-    return { text: 'Which district? Type the name, e.g. Chipata.', options: {} };
+    return { text: `${ackPrefix(chatId)}Which district? Type the name, e.g. Chipata.`, options: {} };
   }
   if (!foundAny) {
-    return { text: 'Anything else? Tap an action or send a new district and crop.', options: { reply_markup: ACTION_KEYBOARD } };
+    return { text: 'Anything else? Send a new district and crop, or tap a language.', options: { reply_markup: LANGUAGE_KEYBOARD } };
   }
-  return { text: await buildAdvisory(s), options: { parse_mode: 'Markdown' } };
+  const { text, decision, stale } = await buildAdvisory(s);
+  if (decision) updateState(chatId, { last: { decision, stale, district: s.district, crop: s.crop, action: s.action } });
+  return { text, options: { parse_mode: 'Markdown', reply_markup: LANGUAGE_KEYBOARD } };
 }
 
 async function handleText(chatId, text) {
@@ -119,13 +146,67 @@ async function handleText(chatId, text) {
       return runIfReady(chatId, true, text);
     }
   }
+  const lang = parseLanguage(text);
+  if (lang) updateState(chatId, { language: lang });
   const action = parseAction(text);
+  if (action && !SUPPORTED_ACTIONS.includes(action)) {
+    return { text: 'For now I advise on planting and crop health. Tap Plant or 📷 Crop health.', options: { reply_markup: ACTION_KEYBOARD } };
+  }
+  if (action === 'crop-health') {
+    updateState(chatId, { action });
+    return { text: CROP_HEALTH_INTRO, options: { parse_mode: 'Markdown' } };
+  }
   if (action) updateState(chatId, { action });
   const cropM = extractCrop(text);
   if (cropM.matched) updateState(chatId, { crop: cropM.crop });
   const distM = resolveDistrict(text);
   if (distM.matched) updateState(chatId, { district: distM });
-  return runIfReady(chatId, Boolean(action || cropM.matched || distM.matched), text);
+
+  const s = getState(chatId);
+  const otherFound = Boolean(action || cropM.matched || distM.matched);
+  // Language-only follow-up: re-render the stored reply, no refetch.
+  if (lang && !otherFound && s.last) {
+    const shown = await translateDecision(
+      s.last.decision,
+      { district: (s.last.district && s.last.district.name) || 'your area', crop: s.last.crop || 'crop', action: s.last.action },
+      lang
+    );
+    return {
+      text: formatReply(shown, { district: s.last.district, crop: s.last.crop, action: s.last.action, stale: s.last.stale }),
+      options: { parse_mode: 'Markdown', reply_markup: LANGUAGE_KEYBOARD },
+    };
+  }
+  if (s.action === 'crop-health') {
+    return { text: 'Please send a photo of the affected plant. Close-ups of leaves work best.', options: {} };
+  }
+  if (lang && !otherFound) updateState(chatId, { langAck: true });
+  return runIfReady(chatId, Boolean(otherFound || lang), text);
+}
+
+async function handlePhoto(chatId, msg, bot) {
+  const s = getState(chatId);
+  const fileId = pickPhotoId(msg);
+  if (!fileId) return { text: 'I could not read that photo. Please try again.', options: {} };
+  try {
+    const { base64, mimeType } = await fetchPhotoBase64(bot, fileId);
+    const decision = await analyzeCropImage(base64, mimeType, { crop: s.crop });
+    const shown = await translateDecision(
+      decision,
+      { district: (s.district && s.district.name) || 'your area', crop: s.crop || 'crop', action: 'crop-health' },
+      s.language
+    );
+    updateState(chatId, {
+      action: null,
+      last: { decision, stale: false, district: s.district || null, crop: s.crop || null, action: 'crop-health' },
+    });
+    return {
+      text: formatReply(shown, { district: s.district || null, crop: s.crop || null, action: 'crop-health', stale: false }),
+      options: { parse_mode: 'Markdown', reply_markup: LANGUAGE_KEYBOARD },
+    };
+  } catch (err) {
+    logger.warn('crophealth', 'photo analysis failed', { error: err.message });
+    return { text: 'Sorry, I could not analyse that photo. Please send a clearer close-up of the affected leaves.', options: {} };
+  }
 }
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -139,14 +220,22 @@ if (!token) {
     bot.sendMessage(msg.chat.id, WELCOME, { reply_markup: ACTION_KEYBOARD });
   });
   bot.on('message', async (msg) => {
-    if (!msg.text || msg.text.startsWith('/start')) return;
-    logger.info('telegram', 'message received', { chat: msg.chat.id });
+    if (msg.text && msg.text.startsWith('/start')) return;
+    logger.info('telegram', 'message received', { chat: msg.chat.id, hasPhoto: Boolean(msg.photo && msg.photo.length) });
     try {
-      const reply = await handleText(msg.chat.id, msg.text);
-      await bot.sendMessage(msg.chat.id, reply.text, reply.options);
+      if (msg.photo && msg.photo.length) {
+        await bot.sendMessage(msg.chat.id, '🔍 Looking at your photo...');
+        const reply = await handlePhoto(msg.chat.id, msg, bot);
+        await bot.sendMessage(msg.chat.id, reply.text, reply.options);
+      } else if (msg.text) {
+        const reply = await handleText(msg.chat.id, msg.text);
+        await bot.sendMessage(msg.chat.id, reply.text, reply.options);
+      } else {
+        await bot.sendMessage(msg.chat.id, 'Please send text or a photo.');
+      }
     } catch (err) {
       logger.error('telegram', 'reply failed', { error: err.message });
-      await bot.sendMessage(msg.chat.id, 'Sorry, I could not build advice right now. Please try again with your district and crop.');
+      await bot.sendMessage(msg.chat.id, 'Sorry, something went wrong. Please try again.');
     }
   });
 }
@@ -155,4 +244,4 @@ app.listen(PORT, () => {
   logger.info('http', `agrisense listening on ${PORT}`);
 });
 
-module.exports = { app, handleText, buildAdvisory };
+module.exports = { app, handleText, handlePhoto, buildAdvisory };

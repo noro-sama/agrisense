@@ -2,7 +2,8 @@
 // and the TTL cache (incl. stale-serving for graceful degradation).
 const assert = require('node:assert/strict');
 const { computeFeatures, computeFertiliserFeatures, computeTillageFeatures, NO_WINDOW } = require('../server/services/featureService');
-const { parseAction } = require('../server/services/telegramService');
+const { parseAction, parseLanguage, SUPPORTED_ACTIONS } = require('../server/services/telegramService');
+const { pickPhotoId } = require('../server/services/cropHealthService');
 const { TTLCache, buildKey } = require('../server/utils/cache');
 
 let passed = 0;
@@ -140,8 +141,27 @@ check('parseAction: plant/fertiliser/till, no false positives', () => {
   assert.equal(parseAction('Apply fertiliser'), 'fertiliser');
   assert.equal(parseAction('I need DAP'), 'fertiliser');
   assert.equal(parseAction('Till fields'), 'till');
+  assert.equal(parseAction('📷 Crop health'), 'crop-health');
   assert.equal(parseAction('still waiting'), null);
   assert.equal(parseAction('hello'), null);
+});
+
+check('parseLanguage: four languages, null otherwise', () => {
+  assert.equal(parseLanguage('Bemba'), 'bemba');
+  assert.equal(parseLanguage('Answer in Nyanja'), 'nyanja');
+  assert.equal(parseLanguage('tonga'), 'tonga');
+  assert.equal(parseLanguage('English please'), 'english');
+  assert.equal(parseLanguage('hello'), null);
+});
+
+check('supported actions are plant + crop-health', () => {
+  assert.deepEqual(SUPPORTED_ACTIONS, ['plant', 'crop-health']);
+});
+
+check('pickPhotoId: largest size wins, null when empty', () => {
+  assert.equal(pickPhotoId({ photo: [{ file_id: 'small' }, { file_id: 'big' }] }), 'big');
+  assert.equal(pickPhotoId({}), null);
+  assert.equal(pickPhotoId({ photo: [] }), null);
 });
 
 console.log(`\n${passed} checks passed`);

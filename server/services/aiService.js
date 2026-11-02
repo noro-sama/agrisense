@@ -13,6 +13,7 @@ const META_MODEL_ID = process.env.MODEL_ID || process.env.META_MODEL_ID || 'muse
 const MAX_TOKENS = 2048;
 // Slow real answer beats fast fallback; end-to-end budget is best-effort.
 const TIMEOUT_MS = 25000;
+const VISION_TIMEOUT_MS = 40000;
 
 const NO_WINDOW = 'no planting window in current forecast';
 const ACTION_LABELS = { plant: 'PLANT', fertiliser: 'APPLY', till: 'TILL' };
@@ -68,20 +69,20 @@ function extractText(data) {
   return '';
 }
 
-async function callMetaModel(system, user, useSchema) {
+async function callMetaModel(system, content, schema, timeoutMs = TIMEOUT_MS) {
   if (!META_API_KEY) {
     throw new Error('aiService: MODEL_API_KEY not configured');
   }
   const body = {
     model: META_MODEL_ID,
     system,
-    messages: [{ role: 'user', content: user }],
+    messages: [{ role: 'user', content }],
     max_tokens: MAX_TOKENS,
   };
   body.output_config = { effort: 'low' };
-  if (useSchema) body.output_config.format = { type: 'json_schema', schema: MODEL_SCHEMA };
+  if (schema) body.output_config.format = { type: 'json_schema', schema };
   const res = await axios.post(`${META_BASE_URL}/v1/messages`, body, {
-    timeout: TIMEOUT_MS,
+    timeout: timeoutMs,
     headers: { Authorization: `Bearer ${META_API_KEY}` },
   });
   const text = extractText(res.data).replace(/```json|```/g, '').trim();
@@ -246,7 +247,7 @@ async function getPlantingDecision(input) {
 
   let raw;
   try {
-    ({ text: raw } = await callMetaModel(system, user, true));
+    ({ text: raw } = await callMetaModel(system, user, MODEL_SCHEMA));
   } catch (err) {
     logger.warn('ai', 'Meta API unreachable, using rule-based fallback', { error: err.message });
     return ruleBasedAdvice({ ...input, action }, sourcesUsed, 'AI unavailable, rule-based advice (low confidence)');
@@ -270,4 +271,117 @@ async function getPlantingDecision(input) {
   return validateAndOverride(toDecision(parsed, action, input, sourcesUsed), input.features, action);
 }
 
-module.exports = { getPlantingDecision, validateAndOverride, ruleBasedAdvice, MODEL_SCHEMA, ACTION_LABELS };
+const HEALTH_SCHEMA = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', enum: ['HEALTHY', 'SUSPECT'] },
+    confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+    explanation: { type: 'string' },
+    timing: { type: 'string' },
+    cautions: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['verdict', 'confidence', 'explanation', 'timing', 'cautions'],
+};
+
+const HEALTH_RETRY_INSTRUCTION = 'Reply with ONLY the JSON object matching this shape: {"verdict":"HEALTHY|SUSPECT","confidence":"high|medium|low","explanation":"...","timing":"...","cautions":[...]}. No other text.';
+
+function isValidHealthShape(o) {
+  return (
+    o && typeof o === 'object' &&
+    (o.verdict === 'HEALTHY' || o.verdict === 'SUSPECT') &&
+    (o.confidence === 'high' || o.confidence === 'medium' || o.confidence === 'low') &&
+    typeof o.explanation === 'string' && o.explanation.length > 0 &&
+    typeof o.timing === 'string' && o.timing.length > 0 &&
+    Array.isArray(o.cautions)
+  );
+}
+
+// Crop-health verdict from a photo. Same decision envelope as advisories, so
+// replies, translation, and formatting are shared. verdict HEALTHY|SUSPECT.
+async function analyzeCropImage(imageBase64, mimeType, context) {
+  const system = `You are Agrisense crop doctor for Zambian smallholder farmers. A human farmer makes the final call; you inform it.
+RULES: describe ONLY symptoms visible in the photo; never invent diseases, pests, or details you cannot see. If the photo is too blurry, dark, or far to judge, verdict MUST be SUSPECT with low confidence and ask for a closer photo. verdict HEALTHY only when the plant looks clearly healthy. Reply under the given JSON schema.
+STYLE: plain farmer-friendly sentences, one or two sentences for explanation; timing must name immediate action steps.`;
+  const content = [
+    { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
+    { type: 'text', text: `Crop: ${(context && context.crop) || 'unknown'}. Assess this plant's health and reply under the schema.` },
+  ];
+  const toHealth = (parsed) => ({
+    recommendation: parsed.verdict,
+    confidence: parsed.confidence,
+    reason_plain: parsed.explanation,
+    timing: parsed.timing,
+    risk_flags: [...parsed.cautions, 'Unsure? Confirm with your extension officer'],
+    context_notes: [],
+    sources_used: ['muse-spark:vision'],
+  });
+  const fallback = (note) => ({
+    recommendation: 'SUSPECT',
+    confidence: 'low',
+    reason_plain: 'I could not analyse this photo clearly. Please send a closer, well-lit photo of the affected leaves.',
+    timing: 'send a clearer close-up photo',
+    risk_flags: ['Unclear photo'],
+    context_notes: note ? [note] : [],
+    sources_used: ['muse-spark:vision'],
+  });
+
+  let raw;
+  try {
+    ({ text: raw } = await callMetaModel(system, content, HEALTH_SCHEMA, VISION_TIMEOUT_MS));
+  } catch (err) {
+    logger.warn('ai', 'vision call failed, using fallback', { error: err.message });
+    return fallback('AI unavailable');
+  }
+  let parsed;
+  try {
+    parsed = parseModelJson(raw);
+    if (!isValidHealthShape(parsed)) throw new Error('schema mismatch');
+  } catch (err) {
+    logger.warn('ai', 'vision reply unparseable, retrying once', { error: err.message });
+    try {
+      ({ text: raw } = await callMetaModel(system, [...content, { type: 'text', text: HEALTH_RETRY_INSTRUCTION }], null, VISION_TIMEOUT_MS));
+      parsed = parseModelJson(raw);
+      if (!isValidHealthShape(parsed)) throw new Error('schema mismatch on retry');
+    } catch (err2) {
+      logger.warn('ai', 'vision retry failed, using fallback', { error: err2.message });
+      return fallback('AI reply invalid');
+    }
+  }
+  return toHealth(parsed);
+}
+
+const TRANSLATION_SCHEMA = {
+  type: 'object',
+  properties: {
+    explanation: { type: 'string' },
+    timing: { type: 'string' },
+    cautions: { type: 'array', items: { type: 'string' } },
+    notes: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['explanation', 'timing', 'cautions', 'notes'],
+};
+const LANGUAGE_NAMES = { bemba: 'Bemba (Chibemba)', nyanja: 'Nyanja (Chinyanja)', tonga: 'Tonga (Chitonga)', english: 'English' };
+
+// Translate a finished decision. Verdict, confidence, and numbers stay
+// untouched; only human-facing text is translated. Single attempt: on failure
+// the original English is returned with a note.
+async function translateDecision(decision, context, language) {
+  if (!language || language === 'english') return decision;
+  const langName = LANGUAGE_NAMES[language] || language;
+  const system = `You translate Zambian farming advice into ${langName}. RULES: preserve every number, date, rainfall figure, and place or crop name exactly; plain farmer-friendly ${langName}; reply under the given JSON schema.`;
+  const user = `Translate this ${context.action || 'planting'} advice for ${context.crop} in ${context.district}:\n${JSON.stringify({ explanation: decision.reason_plain, timing: decision.timing, cautions: decision.risk_flags, notes: decision.context_notes })}`;
+  try {
+    const { text: raw } = await callMetaModel(system, user, TRANSLATION_SCHEMA);
+    const parsed = parseModelJson(raw);
+    const ok = parsed && typeof parsed.explanation === 'string' && parsed.explanation.length > 0
+      && typeof parsed.timing === 'string' && parsed.timing.length > 0
+      && Array.isArray(parsed.cautions) && Array.isArray(parsed.notes);
+    if (!ok) throw new Error('schema mismatch');
+    return { ...decision, reason_plain: parsed.explanation, timing: parsed.timing, risk_flags: parsed.cautions, context_notes: parsed.notes };
+  } catch (err) {
+    logger.warn('ai', 'translation failed, keeping English', { error: err.message, language });
+    return { ...decision, context_notes: [...decision.context_notes, 'Translation unavailable, showing English'] };
+  }
+}
+
+module.exports = { getPlantingDecision, translateDecision, analyzeCropImage, validateAndOverride, ruleBasedAdvice, MODEL_SCHEMA, ACTION_LABELS };
