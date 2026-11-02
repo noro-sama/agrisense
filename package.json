@@ -1,0 +1,21 @@
+{
+  "name": "agrisense",
+  "version": "0.1.0",
+  "description": "Agricultural decision engine for smallholder farmers in Zambia",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node tests/featureService.test.js",
+    "validate:districts": "node scripts/validate-districts.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}

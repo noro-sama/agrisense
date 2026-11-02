@@ -1,0 +1,23 @@
+Mpika, Muchinga - groundnuts (planting)
+PLANT (high confidence)
+has_effective_rain_in_window is true with 26.5mm in next 5d above 10mm minimum; first effective rain 2026-11-06 at 91% confidence with 0 heavy rain risk days, 0 heat stress days and 0 dry streak days through 2026-11-08.
+Timing: plant around 2026-11-06, window through 2026-11-08
+Notes: Last season drought: moderate (historical, 2023/24); Soil: Acrisols, Ferralsols; pH 4.3-5.6; sandy loams over red clays; acidity; low inherent fertility
+
+how i want it to be
+
+this is the response from my bot, i need you to make it more human readable. perhaps have some italics, bullet points and instead of has_rain_within_window: just say effective rain of 26.55 within next 5 days
+
+here are some tips to make it more human readable:
+Emojis as Visual Anchors: Farmers scan text quickly. 🌧️ means rain, 📅 means dates.
+Bold Headers: Telegram supports MarkdownV2 or simple Markdown. *Bold* works universally.
+Human Language: Instead of has_effective_rain_in_window: true, it says 🌧️ Effective rain: 26.5mm.
+Structured Lists: Bullet points (using \n) make it readable on small screens.
+
+Mpika, Muchinga - groundnuts (planting)
+PLANT (high confidence)
+has_effective_rain_in_window is true with 26.5mm in next 5d above 10mm minimum; first effective rain 2026-11-06 at 91% confidence with 0 heavy rain risk days, 0 heat stress days and 0 dry streak days through 2026-11-08.
+Timing: plant around 2026-11-06, window through 2026-11-08
+Notes: Last season drought: moderate (historical, 2023/24); Soil: Acrisols, Ferralsols; pH 4.3-5.6; sandy loams over red clays; acidity; low inherent fertility
+
+muse resume 01a19aad-a1ed-7293-a806-bd4b58490f5f

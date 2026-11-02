@@ -1,0 +1,129 @@
+{
+  "base_url": "https://api.agririgo.com/api/v1",
+  "auth": "None, but calls are limited to prevent abuse",
+  "endpoints": {
+    "/production": {
+      "type": "compiled",
+      "description": "National crop production 2000-2025 (thousand tonnes). Maize has full 26-year series; other crops recent seasons only.",
+      "params": {
+        "crop": "slug: maize, soybeans, wheat",
+        "from": "YYYY (inclusive)",
+        "to": "YYYY (inclusive)"
+      },
+      "cache_ttl_hours": 720,
+      "source": "ZamStats Crop Forecast Surveys + FAOSTAT"
+    },
+    "/drought/2024": {
+      "type": "compiled",
+      "description": "2023/24 El Niño drought impact. National + province-level maize area losses are official. People-affected figures are model estimates.",
+      "params": {
+        "province": "name or slug e.g. Southern"
+      },
+      "cache_ttl_hours": 720,
+      "source": "ZamStats 2024 Integrated Agriculture Survey Highlights (Oct 2025)"
+    },
+    "/rainfall": {
+      "type": "model-estimate",
+      "description": "Rainfall as % of 30-year normal for 2023/24 and 2024/25 seasons by province.",
+      "params": {
+        "province": "name or slug",
+        "season": "2023%2F24 or 2024%2F25 (URL-encode slash)"
+      },
+      "cache_ttl_hours": 168,
+      "source": "Zambia Met Dept + CHIRPS satellite data"
+    },
+    "/food-security": {
+      "type": "compiled",
+      "description": "People in IPC Phase 3+ acute food insecurity across recent lean seasons.",
+      "params": {},
+      "cache_ttl_hours": 720,
+      "source": "IPC Zambia analyses 2022-2025"
+    },
+    "/prices": {
+      "type": "model-estimate",
+      "description": "Indicative national-average retail prices, monthly 2023-2025. NOT official statistics.",
+      "params": {
+        "commodity": "maize-grain | mealie-meal-breakfast",
+        "from": "YYYY-MM",
+        "to": "YYYY-MM"
+      },
+      "cache_ttl_hours": 24,
+      "source": "WFP market monitoring + FRA announcements"
+    },
+    "/provinces": {
+      "type": "compiled",
+      "description": "Reference data for all 10 provinces: admin, demographic, agro-ecological attributes.",
+      "params": {},
+      "cache_ttl_hours": 2160,
+      "source": "ZamStats 2022 Census"
+    },
+    "/districts": {
+      "type": "compiled",
+      "description": "44 agriculturally significant districts with zone, key crops, 2023/24 drought severity. Covers main production areas only (of 116 total).",
+      "params": {
+        "province": "name or slug",
+        "severity": "extreme|severe|high|moderate|low"
+      },
+      "cache_ttl_hours": 2160,
+      "source": "Ministry of Agriculture district profiles"
+    },
+    "/soils": {
+      "type": "compiled",
+      "description": "Dominant soil groups (WRB), pH ranges, textures, agronomic constraints per province.",
+      "params": {
+        "province": "name or slug"
+      },
+      "cache_ttl_hours": 2160,
+      "source": "ISRIC SoilGrids 2.0 + Zambia agro-ecological zoning"
+    },
+    "/indicators": {
+      "type": "compiled",
+      "description": "Headline structural indicators: economic weight, land use, farm structure, inputs, livestock.",
+      "params": {},
+      "cache_ttl_hours": 720,
+      "source": "World Bank WDI"
+    },
+    "/ias-2024": {
+      "type": "official",
+      "description": "Official IAS results (published Oct 30 2025): farm households, maize area/production/yield by province, livestock, structural indicators.",
+      "params": {},
+      "cache_ttl_hours": 2160,
+      "source": "ZamStats 2024 IAS Highlights. 50x2030 Initiative (WB, FAO, IFAD)"
+    },
+    "/africa": {
+      "type": "compiled",
+      "description": "Continental compilation: agro-regions, farming systems, soils, staples, data challenges per country.",
+      "params": {},
+      "cache_ttl_hours": 2160,
+      "source": "FAO farming systems classification"
+    },
+    "/indicators/live": {
+      "type": "official",
+      "description": "LIVE time series relayed from World Bank, refreshed daily. Self-updating.",
+      "params": {
+        "code": "ag-gdp-share | ag-employment | arable-land | cereal-yield | fertilizer-use | rural-population | food-inflation | gdp-growth",
+        "country": "ISO3 default ZMB, e.g. KEN, NGA, ETH"
+      },
+      "cache_ttl_hours": 24,
+      "source": "World Bank Open Data API live relay"
+    },
+    "/weather/live": {
+      "type": "official",
+      "description": "LIVE current weather + 7-day forecast for any Zambia point. Real-time relay.",
+      "params": {
+        "lat": "default -15.42 (Lusaka)",
+        "lon": "default 28.28 (Lusaka)"
+      },
+      "cache_ttl_hours": 0.25,
+      "source": "Open-Meteo.com live relay"
+    }
+  },
+  "critical_rules_for_ai": [
+    "NEVER invent endpoint paths not listed above.",
+    "NEVER add query params not listed for that endpoint.",
+    "Fields marked 'model-estimate' must be labeled as indicative, not official.",
+    "Season slashes MUST be URL-encoded as %2F.",
+    "If a param is missing or invalid, return error to user rather than guessing defaults beyond those documented.",
+    "Respect cache_ttl_hours exactly. Do not refetch within TTL window."
+  ]
+}

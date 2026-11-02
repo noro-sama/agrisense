@@ -1,0 +1,380 @@
+{
+  "_meta": {
+    "source": "Curated from Zambia ABS district names + Wikipedia coordinates",
+    "sanity_check": "lat must be negative, lon positive",
+    "updated": "2026-10-31",
+    "enriched_from": "AgriRigo /districts (Ministry of Agriculture profiles)",
+    "enriched_on": "2026-11-02"
+  },
+  "districts": {
+    "kasama": {
+      "lat": -10.2167,
+      "lon": 31.1833,
+      "province": "Northern",
+      "zone": "III",
+      "key_crops": ["cassava", "beans", "rice"],
+      "drought_severity_2023_24": "low"
+    },
+    "mbala": {
+      "lat": -9.1833,
+      "lon": 31.0667,
+      "province": "Northern",
+      "zone": "III",
+      "key_crops": ["maize", "beans", "coffee"],
+      "drought_severity_2023_24": "low"
+    },
+    "mpika": {
+      "lat": -11.5667,
+      "lon": 31.45,
+      "province": "Muchinga",
+      "zone": "III",
+      "key_crops": ["maize", "cassava"],
+      "drought_severity_2023_24": "moderate"
+    },
+    "mansa": {
+      "lat": -11.05,
+      "lon": 29.7,
+      "province": "Luapula",
+      "zone": "III",
+      "key_crops": ["cassava", "maize"],
+      "drought_severity_2023_24": "low"
+    },
+    "samfya": {
+      "lat": -13.9333,
+      "lon": 29.2333,
+      "province": "Luapula",
+      "zone": "III",
+      "key_crops": ["fisheries", "cassava", "rice"],
+      "drought_severity_2023_24": "low"
+    },
+    "ndola": {
+      "lat": -12.95,
+      "lon": 28.6333,
+      "province": "Copperbelt",
+      "zone": "III",
+      "key_crops": ["vegetables", "poultry"],
+      "drought_severity_2023_24": "high"
+    },
+    "kitwe": {
+      "lat": -12.8028,
+      "lon": 28.3836,
+      "province": "Copperbelt"
+    },
+    "chingola": {
+      "lat": -12.5333,
+      "lon": 27.8667,
+      "province": "Copperbelt",
+      "zone": "III",
+      "key_crops": ["maize", "vegetables"],
+      "drought_severity_2023_24": "high"
+    },
+    "mufulira": {
+      "lat": -12.55,
+      "lon": 28.2167,
+      "province": "Copperbelt"
+    },
+    "chinsali": {
+      "lat": -10.0833,
+      "lon": 31.6833,
+      "province": "Muchinga",
+      "zone": "III",
+      "key_crops": ["maize", "beans"],
+      "drought_severity_2023_24": "moderate"
+    },
+    "luwingu": {
+      "lat": -9.5833,
+      "lon": 30.65,
+      "province": "Northern",
+      "zone": "III",
+      "key_crops": ["cassava", "millet"],
+      "drought_severity_2023_24": "low"
+    },
+    "chipata": {
+      "lat": -13.6333,
+      "lon": 32.65,
+      "province": "Eastern",
+      "zone": "IIa",
+      "key_crops": ["maize", "groundnuts", "cotton"],
+      "drought_severity_2023_24": "high"
+    },
+    "petauke": {
+      "lat": -14.4333,
+      "lon": 32.5167,
+      "province": "Eastern",
+      "zone": "IIa",
+      "key_crops": ["maize", "cotton", "sunflower"],
+      "drought_severity_2023_24": "high"
+    },
+    "katete": {
+      "lat": -14.8,
+      "lon": 32.15,
+      "province": "Eastern",
+      "zone": "IIa",
+      "key_crops": ["maize", "groundnuts"],
+      "drought_severity_2023_24": "high"
+    },
+    "kafue": {
+      "lat": -15.6,
+      "lon": 28.2,
+      "province": "Lusaka",
+      "zone": "IIa",
+      "key_crops": ["maize", "fisheries"],
+      "drought_severity_2023_24": "severe"
+    },
+    "chongwe": {
+      "lat": -15.7,
+      "lon": 28.4,
+      "province": "Lusaka",
+      "zone": "IIa",
+      "key_crops": ["maize", "horticulture"],
+      "drought_severity_2023_24": "severe"
+    },
+    "mongu": {
+      "lat": -15.2833,
+      "lon": 23.0667,
+      "province": "Western",
+      "zone": "IIb",
+      "key_crops": ["rice", "cattle"],
+      "drought_severity_2023_24": "extreme"
+    },
+    "senanga": {
+      "lat": -16.2333,
+      "lon": 23.6,
+      "province": "Western",
+      "zone": "IIb",
+      "key_crops": ["rice", "cassava"],
+      "drought_severity_2023_24": "extreme"
+    },
+    "kaoma": {
+      "lat": -14.6333,
+      "lon": 24.4167,
+      "province": "West",
+      "zone": "IIb",
+      "key_crops": ["maize", "cashew"],
+      "drought_severity_2023_24": "severe"
+    },
+    "choma": {
+      "lat": -16.6833,
+      "lon": 26.9833,
+      "province": "Southern",
+      "zone": "IIa",
+      "key_crops": ["maize", "cattle"],
+      "drought_severity_2023_24": "extreme"
+    },
+    "monze": {
+      "lat": -16.1667,
+      "lon": 27.6,
+      "province": "Southern",
+      "zone": "IIa",
+      "key_crops": ["maize", "cattle"],
+      "drought_severity_2023_24": "extreme"
+    },
+    "mazabuka": {
+      "lat": -16.3667,
+      "lon": 27.7667,
+      "province": "Southern",
+      "zone": "IIa",
+      "key_crops": ["sugarcane", "maize"],
+      "drought_severity_2023_24": "severe"
+    },
+    "namwala": {
+      "lat": -16.9333,
+      "lon": 26.5833,
+      "province": "Southern",
+      "zone": "IIa",
+      "key_crops": ["cattle", "maize"],
+      "drought_severity_2023_24": "severe"
+    },
+    "kalomo": {
+      "lat": -17.7,
+      "lon": 27.45,
+      "province": "Southern",
+      "zone": "IIa",
+      "key_crops": ["maize", "tobacco"],
+      "drought_severity_2023_24": "extreme"
+    },
+    "livingstone": {
+      "lat": -17.8333,
+      "lon": 25.8333,
+      "province": "Southern"
+    },
+    "sinazongwe": {
+      "lat": -17.9333,
+      "lon": 28.0333,
+      "province": "Southern",
+      "zone": "I",
+      "key_crops": ["sorghum", "fisheries"],
+      "drought_severity_2023_24": "extreme"
+    },
+    "solwezi": {
+      "lat": -12.2167,
+      "lon": 26.3833,
+      "province": "North-Western",
+      "zone": "III",
+      "key_crops": ["maize", "beans"],
+      "drought_severity_2023_24": "moderate"
+    },
+    "mwinilunga": {
+      "lat": -10.7833,
+      "lon": 26.5333,
+      "province": "North-Western",
+      "zone": "III",
+      "key_crops": ["pineapple", "cassava"],
+      "drought_severity_2023_24": "low"
+    },
+    "kabompo": {
+      "lat": -11.25,
+      "lon": 26.15,
+      "province": "North-Western"
+    },
+    "zambezi": {
+      "lat": -14.1667,
+      "lon": 24.2833,
+      "province": "North-Western",
+      "zone": "IIb",
+      "key_crops": ["cassava", "rice"],
+      "drought_severity_2023_24": "moderate"
+    },
+    "kabwe": {
+      "lat": -14.2969,
+      "lon": 28.4422,
+      "province": "Central",
+      "zone": "IIa",
+      "key_crops": ["maize", "horticulture"],
+      "drought_severity_2023_24": "severe"
+    },
+    "serenje": {
+      "lat": -13.0667,
+      "lon": 29.5,
+      "province": "Central",
+      "zone": "III",
+      "key_crops": ["maize", "beans"],
+      "drought_severity_2023_24": "moderate"
+    },
+    "kapiri mposhi": {
+      "lat": -13.8667,
+      "lon": 28.7333,
+      "province": "Central"
+    },
+    "mkushi": {
+      "lat": -13.5833,
+      "lon": 28.65,
+      "province": "Central",
+      "zone": "IIa",
+      "key_crops": ["maize", "wheat", "soybeans"],
+      "drought_severity_2023_24": "high"
+    },
+    "chibombo": {
+      "lat": -14.5,
+      "lon": 28.25,
+      "province": "Central",
+      "zone": "IIa",
+      "key_crops": ["maize", "vegetables"],
+      "drought_severity_2023_24": "severe"
+    },
+    "lusaka": {
+      "lat": -15.3875,
+      "lon": 28.3228,
+      "province": "Lusaka"
+    },
+    "gwembe": {
+      "province": "Southern",
+      "zone": "I",
+      "key_crops": ["sorghum", "goats"],
+      "drought_severity_2023_24": "extreme",
+      "note": "Valley Region I, chronic drought exposure"
+    },
+    "sesheke": {
+      "province": "Western",
+      "zone": "I",
+      "key_crops": ["cattle", "maize"],
+      "drought_severity_2023_24": "extreme"
+    },
+    "mumbwa": {
+      "province": "Central",
+      "zone": "IIa",
+      "key_crops": ["maize", "cotton", "soybeans"],
+      "drought_severity_2023_24": "severe",
+      "note": "Agririgo field-research site"
+    },
+    "luangwa": {
+      "province": "Lusaka",
+      "zone": "I",
+      "key_crops": ["sorghum", "fisheries"],
+      "drought_severity_2023_24": "extreme"
+    },
+    "rufunsa": {
+      "province": "Lusaka",
+      "zone": "I",
+      "key_crops": ["maize", "goats"],
+      "drought_severity_2023_24": "severe"
+    },
+    "lundazi": {
+      "province": "Eastern",
+      "zone": "IIa",
+      "key_crops": ["maize", "tobacco"],
+      "drought_severity_2023_24": "moderate"
+    },
+    "nyimba": {
+      "province": "Eastern",
+      "zone": "I",
+      "key_crops": ["cotton", "sorghum"],
+      "drought_severity_2023_24": "severe"
+    },
+    "mpongwe": {
+      "province": "Copperbelt",
+      "zone": "III",
+      "key_crops": ["maize", "wheat", "soybeans"],
+      "drought_severity_2023_24": "moderate",
+      "note": "Commercial block with irrigation"
+    },
+    "masaiti": {
+      "province": "Copperbelt",
+      "zone": "III",
+      "key_crops": ["maize", "cassava"],
+      "drought_severity_2023_24": "high"
+    },
+    "kasempa": {
+      "province": "North-Western",
+      "zone": "III",
+      "key_crops": ["maize", "cassava"],
+      "drought_severity_2023_24": "moderate"
+    },
+    "isoka": {
+      "province": "Muchinga",
+      "zone": "III",
+      "key_crops": ["maize", "coffee"],
+      "drought_severity_2023_24": "low"
+    },
+    "nakonde": {
+      "province": "Muchinga",
+      "zone": "III",
+      "key_crops": ["maize", "beans"],
+      "drought_severity_2023_24": "low",
+      "note": "Border trade hub"
+    },
+    "kawambwa": {
+      "province": "Luapula",
+      "zone": "III",
+      "key_crops": ["cassava", "palm oil"],
+      "drought_severity_2023_24": "low"
+    },
+    "nchelenge": {
+      "province": "Luapula",
+      "zone": "III",
+      "key_crops": ["fisheries", "cassava"],
+      "drought_severity_2023_24": "low"
+    }
+  },
+  "aliases": {
+    "copperbelt": "ndola",
+    "the capital": "lusaka",
+    "livingstone town": "livingstone",
+    "caprivi": "sesheke"
+  },
+  "default": {
+    "lat": -15.3875,
+    "lon": 28.3228,
+    "province": "Lusaka"
+  }
+}
