@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const logger = require('./utils/logger');
@@ -8,6 +8,7 @@ const { computeFeatures, computeFertiliserFeatures, computeTillageFeatures } = r
 const { getPlantingDecision, translateDecision, analyzeCropImage } = require('./services/aiService');
 const { pickPhotoId, fetchPhotoBase64 } = require('./services/cropHealthService');
 const { getState, updateState, resetState } = require('./services/conversationService');
+const { buildPlan, translatePlan } = require('./services/farmingPlanService');
 const {
   resolveDistrict, extractCrop, parseAction, parseLanguage, formatReply, normalize,
   WELCOME, CROP_HEALTH_INTRO, ACTION_KEYBOARD, CROP_KEYBOARD, DISTRICT_OFFER_KEYBOARD, LANGUAGE_KEYBOARD,
@@ -17,8 +18,31 @@ const {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/', (req, res) => {
+app.use(express.static(require('path').join(__dirname, '..', 'public')));
+app.use(express.json());
+
+app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'agrisense' });
+});
+
+app.post('/api/plan', async (req, res) => {
+  try {
+    res.json({ ok: true, ...(await buildPlan(req.body || {})) });
+  } catch (err) {
+    logger.warn('web', 'plan failed', { error: err.message });
+    res.status(err.status || 502).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/plan/translate', async (req, res) => {
+  try {
+    const { planEn, meta, language } = req.body || {};
+    if (!planEn || !meta) throw Object.assign(new Error('planEn and meta are required.'), { status: 400 });
+    res.json({ ok: true, plan: await translatePlan(planEn, meta, language) });
+  } catch (err) {
+    logger.warn('web', 'plan translation failed', { error: err.message });
+    res.status(err.status || 502).json({ ok: false, error: err.message });
+  }
 });
 
 // Validate district map ONCE at startup via API. Log-only, never blocks boot.

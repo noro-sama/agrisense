@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Farming plan — Agrisense</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="wordmark" href="/">Agrisense</a>
+  <a class="link" href="/check.html">Plant check</a>
+  <a class="link" href="/plan.html">Farming plan</a>
+  <a class="link" href="/learn.html">Learn</a>
+  <a class="btn-telegram" href="https://t.me/agrisense_zed_bot">Telegram bot</a>
+</div></nav>
+<main class="plan-page"><div class="wrap">
+  <h1>Farming plan</h1>
+  <p class="standfirst">A full-season plan for your field, built from live weather, your soils, and last season's drought record.</p>
+
+  <form id="plan-form" class="form no-print">
+    <label>Crop
+      <select name="crop" required>
+        <option value="maize">Maize</option>
+        <option value="beans">Beans</option>
+        <option value="groundnuts">Groundnuts</option>
+        <option value="soybean">Soybean</option>
+      </select>
+    </label>
+    <label>District
+      <input name="district" placeholder="e.g. Kasama" required>
+    </label>
+    <label>Field size (hectares)
+      <input name="hectares" type="number" min="0.1" step="0.1" value="1" required>
+    </label>
+    <label>Water
+      <select name="water">
+        <option value="rainfed">Rain-fed</option>
+        <option value="irrigated">Irrigated</option>
+      </select>
+    </label>
+    <label>Language
+      <select name="language">
+        <option value="english">English</option>
+        <option value="bemba">Bemba</option>
+        <option value="nyanja">Nyanja</option>
+        <option value="tonga">Tonga</option>
+      </select>
+    </label>
+    <button type="submit">Build my plan</button>
+  </form>
+
+  <p id="plan-status" class="status no-print"></p>
+  <div id="plan-output"></div>
+  <div id="plan-actions" class="no-print" style="display:none">
+    <button id="print-btn" type="button">Print / save PDF</button>
+    <label>Language
+      <select id="relang">
+        <option value="english">English</option>
+        <option value="bemba">Bemba</option>
+        <option value="nyanja">Nyanja</option>
+        <option value="tonga">Tonga</option>
+      </select>
+    </label>
+  </div>
+</div></main>
+<script>
+const SECTIONS = [
+  ['field_prep', '🛠️ Field Preparation'],
+  ['planting', '🌱 Planting & Spacing'],
+  ['weeding', '🌿 Weeding & Crop Protection'],
+  ['fertiliser', '🧪 Fertilizer Application'],
+  ['risks', '⚠️ Critical Risks & Mitigation'],
+  ['harvest', '🌾 Harvest & Post-Harvest Tips'],
+];
+let planEn = null, meta = null;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function render(plan) {
+  const out = document.getElementById('plan-output');
+  out.innerHTML = `<h2 class="plan-title">📅 SEASONAL FARMING PLAN: ${esc(meta.crop)} — ${esc(meta.district)} — ${esc(meta.hectares)} ha</h2>` +
+    SECTIONS.map(([key, heading]) =>
+      `<section><h3>${heading}</h3><ul>${(plan[key] || []).map((b) => `<li>${esc(b)}</li>`).join('')}</ul></section>`
+    ).join('');
+  document.getElementById('plan-actions').style.display = 'block';
+}
+
+const STAGES = ['Drafting your timeline…', 'Checking risks…', 'Polishing the plan…'];
+document.getElementById('plan-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  document.getElementById('relang').value = body.language;
+  document.getElementById('plan-output').innerHTML = '';
+  document.getElementById('plan-actions').style.display = 'none';
+  const status = document.getElementById('plan-status');
+  let i = 0;
+  status.textContent = STAGES[0];
+  const tick = setInterval(() => { i = Math.min(i + 1, STAGES.length - 1); status.textContent = STAGES[i]; }, 20000);
+  try {
+    const res = await fetch('/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Plan failed');
+    planEn = data.planEn; meta = data.meta;
+    render(data.plan);
+    status.textContent = '';
+  } catch (err) {
+    status.textContent = `Sorry: ${err.message} Please try again.`;
+  } finally {
+    clearInterval(tick);
+  }
+});
+
+document.getElementById('relang').addEventListener('change', async (e) => {
+  if (!planEn) return;
+  const status = document.getElementById('plan-status');
+  status.textContent = 'Translating…';
+  try {
+    const res = await fetch('/api/plan/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ planEn, meta, language: e.target.value }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Translation failed');
+    render(data.plan);
+    status.textContent = '';
+  } catch (err) {
+    status.textContent = `Sorry: ${err.message} Please try again.`;
+  }
+});
+
+document.getElementById('print-btn').addEventListener('click', () => window.print());
+</script>
+</body>
+</html>

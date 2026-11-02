@@ -69,7 +69,7 @@ function extractText(data) {
   return '';
 }
 
-async function callMetaModel(system, content, schema, timeoutMs = TIMEOUT_MS) {
+async function callMetaModel(system, content, schema, timeoutMs = TIMEOUT_MS, maxTokens = MAX_TOKENS) {
   if (!META_API_KEY) {
     throw new Error('aiService: MODEL_API_KEY not configured');
   }
@@ -77,7 +77,7 @@ async function callMetaModel(system, content, schema, timeoutMs = TIMEOUT_MS) {
     model: META_MODEL_ID,
     system,
     messages: [{ role: 'user', content }],
-    max_tokens: MAX_TOKENS,
+    max_tokens: maxTokens,
   };
   body.output_config = { effort: 'low' };
   if (schema) body.output_config.format = { type: 'json_schema', schema };
@@ -350,6 +350,22 @@ STYLE: plain farmer-friendly sentences, one or two sentences for explanation; ti
   return toHealth(parsed);
 }
 
+// Generic schema-locked call with one plain retry. Returns parsed JSON, throws
+// to the caller on failure (no silent fallback for multi-stage pipelines).
+async function runStructured(system, user, schema, timeoutMs = TIMEOUT_MS, maxTokens = MAX_TOKENS) {
+  let { text: raw } = await callMetaModel(system, user, schema, timeoutMs, maxTokens);
+  try {
+    return parseModelJson(raw);
+  } catch (err) {
+    logger.warn('ai', 'structured reply unparseable, retrying once', { error: err.message });
+    const retryUser = typeof user === 'string'
+      ? `${user}\n\nReply with ONLY the JSON object. No other text.`
+      : [...user, { type: 'text', text: 'Reply with ONLY the JSON object. No other text.' }];
+    ({ text: raw } = await callMetaModel(system, retryUser, null, timeoutMs, maxTokens));
+    return parseModelJson(raw);
+  }
+}
+
 const TRANSLATION_SCHEMA = {
   type: 'object',
   properties: {
@@ -384,4 +400,4 @@ async function translateDecision(decision, context, language) {
   }
 }
 
-module.exports = { getPlantingDecision, translateDecision, analyzeCropImage, validateAndOverride, ruleBasedAdvice, MODEL_SCHEMA, ACTION_LABELS };
+module.exports = { getPlantingDecision, translateDecision, analyzeCropImage, runStructured, validateAndOverride, ruleBasedAdvice, MODEL_SCHEMA, ACTION_LABELS };

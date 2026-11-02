@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server/index.js",
     "test": "node tests/featureService.test.js",
-    "validate:districts": "node scripts/validate-districts.js"
+    "validate:districts": "node scripts/validate-districts.js",
+    "backtest": "node scripts/backtest.js"
   },
   "engines": {
     "node": ">=18"

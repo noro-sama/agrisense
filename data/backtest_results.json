@@ -1,0 +1,59 @@
+{
+  "generated_at": "2026-11-02T17:09:28.557Z",
+  "method": {
+    "scope": "decision-rule robustness under simulated forecast error; NOT true forecast skill (archive holds actuals, not past forecasts)",
+    "locations": [
+      {
+        "district": "lusaka",
+        "province": "Lusaka"
+      },
+      {
+        "district": "choma",
+        "province": "Southern"
+      },
+      {
+        "district": "chipata",
+        "province": "Eastern"
+      },
+      {
+        "district": "kasama",
+        "province": "Northern"
+      }
+    ],
+    "period": "2024-10-01 to 2025-03-31",
+    "crop": "maize (15mm effective threshold)",
+    "pseudoForecast": "seeded multiplicative amount noise sigma~0.35, 10% missed rainy days, 5% false 2mm days; temperature unperturbed",
+    "seed": 20260315,
+    "llmInvolved": false
+  },
+  "weeks": 104,
+  "metrics": {
+    "effectiveRainPrecision": 0.774,
+    "falseWaitRate": 0.2,
+    "maeWeeklyTotalMm": 6.17,
+    "maeTimingDays": 0.5,
+    "timingCoverageWeeks": 24
+  },
+  "perLocation": {
+    "lusaka": {
+      "weeks": 26,
+      "precision": 0.545,
+      "falseWaitRate": 0
+    },
+    "choma": {
+      "weeks": 26,
+      "precision": 0.833,
+      "falseWaitRate": 0.286
+    },
+    "chipata": {
+      "weeks": 26,
+      "precision": 0.875,
+      "falseWaitRate": 0.222
+    },
+    "kasama": {
+      "weeks": 26,
+      "precision": 1,
+      "falseWaitRate": 0.25
+    }
+  }
+}
