@@ -322,6 +322,59 @@ check('farming plan intro links the live site', () => {
   assert.match(FARMING_PLAN_INTRO, /agrisense-f5ky\.onrender\.com\/plan\.html/);
 });
 
+const weekOf = (precip) => ({
+  time: ['2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09'],
+  precipitation_sum: precip,
+  temperature_2m_max: [30, 30, 30, 30, 30, 30, 30],
+});
+
+check('cumulative: wet 3-day spell counts without a big day', () => {
+  const f = computeFeatures(weekOf([7, 7, 7, 0, 0, 0, 0]), 'maize');
+  assert.equal(f.has_effective_rain_in_window, true);
+  assert.equal(f.first_effective_rain_date, '2026-11-03');
+});
+
+check('cumulative: dated at the heaviest day of the spell', () => {
+  const f = computeFeatures(weekOf([4, 14, 4, 0, 0, 0, 0]), 'maize');
+  assert.equal(f.has_effective_rain_in_window, true);
+  assert.equal(f.first_effective_rain_date, '2026-11-04');
+});
+
+check('cumulative: drizzle spells stay WAIT', () => {
+  const f = computeFeatures(weekOf([5, 5, 5, 0, 0, 0, 0]), 'maize');
+  assert.equal(f.has_effective_rain_in_window, false);
+  assert.equal(f.first_effective_rain_date, NO_WINDOW);
+});
+
+const kasamaPast = {
+  time: ['2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02'],
+  precipitation_sum: [0, 0, 0, 4.5, 3.6, 1.1, 4.2],
+};
+const kasamaFcst = () => weekOf([5.1, 1.1, 0.5, 7.5, 5.1, 0, 0]);
+
+check('moisture upgrade: wet soil plus follow-up rain plants (Kasama)', () => {
+  const obs = computeObservedFeatures(kasamaPast, 'maize');
+  assert.equal(obs.observed_rain_last_5d_mm, 13.4);
+  assert.equal(obs.recently_wet, true);
+  assert.equal(computeFeatures(kasamaFcst(), 'maize').has_effective_rain_in_window, false);
+  const f = computeFeatures(kasamaFcst(), 'maize', obs);
+  assert.equal(f.has_effective_rain_in_window, true);
+  assert.equal(f.first_effective_rain_date, '2026-11-03');
+});
+
+check('moisture upgrade: wet soil with dry ahead stays WAIT', () => {
+  const obs = computeObservedFeatures(wetPast, 'maize');
+  assert.equal(obs.recently_wet, true);
+  const f = computeFeatures(dryWeek, 'maize', obs);
+  assert.equal(f.has_effective_rain_in_window, false);
+});
+
+check('moisture upgrade: dry soil never upgrades', () => {
+  const obs = computeObservedFeatures(dryPast, 'maize');
+  const f = computeFeatures(kasamaFcst(), 'maize', obs);
+  assert.equal(f.has_effective_rain_in_window, false);
+});
+
 check('telegram reply renders the recheck line only when present', () => {
   const base = { recommendation: 'WAIT', confidence: 'low', reason_plain: 'dry', timing: 'none', risk_flags: [], context_notes: [] };
   const ctx = { district: { name: 'lusaka', province: 'Lusaka', matched: true }, crop: 'maize', action: 'plant', stale: false };

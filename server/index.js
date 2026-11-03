@@ -123,22 +123,28 @@ async function buildAdvisory(state) {
     };
   }
   sources.push(...forecast.sources_used);
-  let features = computeFeaturesFor(action, forecast.daily, crop);
 
   let observedNote = '';
+  let observed = null;
   try {
     const history = await getRecentRain(district.lat, district.lon);
     sources.push(...history.sources_used);
-    const obs = computeObservedFeatures(history.daily, crop);
-    features = { ...features, ...obs };
-    observedNote = obs.recently_wet
-      ? `Recent rain: ${obs.observed_rain_last_5d_mm}mm in last 5 days (observed) — topsoil may still be moist`
-      : `Recent rain: ${obs.observed_rain_last_5d_mm}mm in last 5 days (observed)`;
+    observed = computeObservedFeatures(history.daily, crop);
+    observedNote = observed.recently_wet
+      ? `Recent rain: ${observed.observed_rain_last_5d_mm}mm in last 5 days (observed) — topsoil may still be moist`
+      : `Recent rain: ${observed.observed_rain_last_5d_mm}mm in last 5 days (observed)`;
     if (history.stale) observedNote += ' (stale cache)';
   } catch (err) {
     logger.warn('telegram', 'recent rain unavailable, continuing without', { error: err.message });
     observedNote = 'recent rainfall unknown';
   }
+
+  // Planting verdicts see observed rain: moist soil plus follow-up rain counts
+  // as an effective window even with no big forecast day.
+  let features = action === 'plant' && observed
+    ? computeFeatures(forecast.daily, crop, observed)
+    : computeFeaturesFor(action, forecast.daily, crop);
+  if (observed) features = { ...features, ...observed };
 
   let soilData = '';
   try {

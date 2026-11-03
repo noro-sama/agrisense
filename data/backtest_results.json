@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T17:09:28.557Z",
+  "generated_at": "2026-11-03T19:01:56.835Z",
   "method": {
     "scope": "decision-rule robustness under simulated forecast error; NOT true forecast skill (archive holds actuals, not past forecasts)",
     "locations": [
@@ -28,32 +28,32 @@
   },
   "weeks": 104,
   "metrics": {
-    "effectiveRainPrecision": 0.774,
-    "falseWaitRate": 0.2,
+    "effectiveRainPrecision": 0.881,
+    "falseWaitRate": 0.159,
     "maeWeeklyTotalMm": 6.17,
-    "maeTimingDays": 0.5,
-    "timingCoverageWeeks": 24
+    "maeTimingDays": 0.41,
+    "timingCoverageWeeks": 37
   },
   "perLocation": {
     "lusaka": {
       "weeks": 26,
-      "precision": 0.545,
-      "falseWaitRate": 0
+      "precision": 0.769,
+      "falseWaitRate": 0.091
     },
     "choma": {
       "weeks": 26,
-      "precision": 0.833,
-      "falseWaitRate": 0.286
+      "precision": 0.8,
+      "falseWaitRate": 0.111
     },
     "chipata": {
       "weeks": 26,
-      "precision": 0.875,
-      "falseWaitRate": 0.222
+      "precision": 1,
+      "falseWaitRate": 0.2
     },
     "kasama": {
       "weeks": 26,
       "precision": 1,
-      "falseWaitRate": 0.25
+      "falseWaitRate": 0.214
     }
   }
 }

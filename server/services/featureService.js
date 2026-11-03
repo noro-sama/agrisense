@@ -2,10 +2,10 @@
 // No network, no Date.now(), no side effects — unit-testable.
 // Thresholds are documented starting values; tune from field feedback.
 const CROP_PROFILES = {
-  maize: { minEffectiveRainMm: 15, waterloggingSensitive: false },
-  beans: { minEffectiveRainMm: 10, waterloggingSensitive: true }, // lost a crop to heavy rain: flag flood risk
-  groundnuts: { minEffectiveRainMm: 10, waterloggingSensitive: false },
-  soybean: { minEffectiveRainMm: 12, waterloggingSensitive: false },
+  maize: { minEffectiveRainMm: 15, cumulative3dMm: 20, waterloggingSensitive: false },
+  beans: { minEffectiveRainMm: 10, cumulative3dMm: 15, waterloggingSensitive: true }, // lost a crop to heavy rain: flag flood risk
+  groundnuts: { minEffectiveRainMm: 10, cumulative3dMm: 15, waterloggingSensitive: false },
+  soybean: { minEffectiveRainMm: 12, cumulative3dMm: 17, waterloggingSensitive: false },
 };
 
 const NO_WINDOW = 'none_within_forecast_window';
@@ -36,7 +36,11 @@ function assertDaily(daily) {
 
 // daily: { time[], precipitation_sum[], temperature_2m_max[], precipitation_probability_max?[] }
 // crop: 'maize' | 'beans' | 'groundnuts' | 'soybean' (case-insensitive)
-function computeFeatures(daily, crop) {
+// observed: computeObservedFeatures() output, or null when history is unknown.
+// Plantable when any trigger fires: one big day (≥ minEffectiveRainMm), a wet
+// 3-day spell (sum ≥ cumulative3dMm, dated at its heaviest day), or moist soil
+// plus enough follow-up rain in the next 5 days (dated at the first rainy day).
+function computeFeatures(daily, crop, observed = null) {
   const n = assertDaily(daily);
   const key = String(crop || '').toLowerCase().trim();
   const profile = CROP_PROFILES[key];
@@ -53,6 +57,26 @@ function computeFeatures(daily, crop) {
   for (let i = 0; i < n; i++) {
     if (rain[i] >= profile.minEffectiveRainMm) { firstIdx = i; break; }
   }
+
+  let cumIdx = -1;
+  for (let i = 0; i + 2 < n; i++) {
+    if (round1(rain[i] + rain[i + 1] + rain[i + 2]) >= profile.cumulative3dMm) {
+      cumIdx = i;
+      if (rain[i + 1] > rain[cumIdx]) cumIdx = i + 1;
+      if (rain[i + 2] > rain[cumIdx]) cumIdx = i + 2;
+      break;
+    }
+  }
+
+  let moistIdx = -1;
+  if (observed && observed.recently_wet && round1(rainNext5) >= profile.minEffectiveRainMm) {
+    for (let i = 0; i < Math.min(5, n); i++) {
+      if (rain[i] > 0) { moistIdx = i; break; }
+    }
+  }
+
+  const triggers = [firstIdx, cumIdx, moistIdx].filter((i) => i !== -1);
+  const best = triggers.length === 0 ? -1 : Math.min(...triggers);
 
   let heavy = 0;
   for (let i = 0; i < n; i++) if (rain[i] >= HEAVY_RAIN_MM) heavy++;
@@ -71,9 +95,9 @@ function computeFeatures(daily, crop) {
     min_effective_rain_mm: profile.minEffectiveRainMm,
     waterlogging_sensitive: profile.waterloggingSensitive,
     rain_next_5d_mm: round1(rainNext5),
-    has_effective_rain_in_window: firstIdx !== -1,
-    first_effective_rain_date: firstIdx === -1 ? NO_WINDOW : daily.time[firstIdx],
-    best_confidence_for_first_effective_rain: firstIdx === -1 || !prob ? null : prob[firstIdx],
+    has_effective_rain_in_window: best !== -1,
+    first_effective_rain_date: best === -1 ? NO_WINDOW : daily.time[best],
+    best_confidence_for_first_effective_rain: best === -1 || !prob ? null : prob[best],
     heavy_rain_risk_days: heavy,
     heat_stress_days: heat,
     dry_streak_days: dryStreak,
@@ -171,10 +195,12 @@ function computeLivestockFeatures(daily) {
 
 // Observed-rain proxy for topsoil moisture. past: { time[], precipitation_sum[] }
 // with the most recent complete day last (historyService drops partial today).
-// Uses the last 5 days; "recently wet" means a crop-effective amount fell and
-// it rained within the last 3 days. Thresholds are starting values.
+// Uses the last 5 days; "recently wet" means a good soaking fell and it rained
+// within the last 3 days. Observed rain is certain and already in the ground,
+// so its bar sits below the forecast single-day bar. Starting values.
 const RECENT_WET_DAYS = 3;
 const OBSERVED_WINDOW = 5;
+const OBSERVED_WET_MM = 10;
 
 function computeObservedFeatures(past, crop) {
   if (!past || typeof past !== 'object') throw new Error('featureService: past payload must be an object');
@@ -206,7 +232,7 @@ function computeObservedFeatures(past, crop) {
     observed_rain_last_5d_mm: round1(total),
     observed_rain_days: days,
     days_since_rain: since,
-    recently_wet: round1(total) >= profile.minEffectiveRainMm && since !== null && since <= RECENT_WET_DAYS,
+    recently_wet: round1(total) >= OBSERVED_WET_MM && since !== null && since <= RECENT_WET_DAYS,
     observed_days: rain.length,
   };
 }
