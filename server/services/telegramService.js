@@ -13,7 +13,7 @@ const CROPS = [
 
 const WELCOME = [
   'Welcome to Agrisense!',
-  'Tap Plant for planting advice, or 📷 Crop health to check a sick plant.',
+  'Tap Plant for planting advice, 📷 Crop health to check a sick plant, or Farming plan for a full-season guide.',
   'You make the final call — I just advise.',
 ].join('\n');
 
@@ -65,6 +65,7 @@ function extractCrop(text) {
 }
 
 const ACTIONS = [
+  { action: 'farming-plan', keywords: ['farming plan', 'season plan'] },
   { action: 'plant', keywords: ['plant', 'planting', 'sow'] },
   { action: 'fertiliser', keywords: ['fertilis', 'fertiliz', 'top dress', 'urea', 'dap', 'manure'] },
   { action: 'till', keywords: ['till', 'tillage', 'plough', 'plow', 'ridge'] },
@@ -72,7 +73,7 @@ const ACTIONS = [
 ];
 
 const ACTION_KEYBOARD = {
-  keyboard: [[{ text: 'Plant' }, { text: '📷 Crop health' }]],
+  keyboard: [[{ text: 'Plant' }, { text: '📷 Crop health' }], [{ text: 'Farming plan' }]],
   resize_keyboard: true,
   one_time_keyboard: true,
 };
@@ -87,12 +88,18 @@ const DISTRICT_OFFER_KEYBOARD = {
   one_time_keyboard: true,
 };
 const ACTION_NOUNS = { plant: 'planting', fertiliser: 'fertiliser', till: 'tillage', 'crop-health': 'crop health' };
-const SUPPORTED_ACTIONS = ['plant', 'crop-health'];
+const SUPPORTED_ACTIONS = ['plant', 'crop-health', 'farming-plan'];
 
 const CROP_HEALTH_INTRO = [
   '📷 *Crop health check*',
   'Send a clear photo of the affected plant. Close-ups of leaves work best.',
   'I will look for signs of disease or pests and advise what to do.',
+].join('\n');
+
+const FARMING_PLAN_INTRO = [
+  '📋 *Season farming plan*',
+  'A full-season guide for your field — land prep to harvest, tuned to your district, soils, and last season\'s drought. Built for printing, in English, Bemba, Nyanja, or Tonga.',
+  '[Build my plan](https://agrisense-f5ky.onrender.com/plan.html)',
 ].join('\n');
 
 const LANGUAGES = { bemba: 'Bemba', nyanja: 'Nyanja', tonga: 'Tonga', english: 'English' };
@@ -145,6 +152,7 @@ function formatReply(decision, { district, crop, action, stale }) {
   lines.push(`${/^(WAIT|SUSPECT)$/.test(decision.recommendation) ? '⏳' : '✅'} *${decision.recommendation}* (${decision.confidence} confidence)`);
   lines.push(`🌧️ ${escapeMd(decision.reason_plain)}`);
   lines.push(`📅 *Timing:* ${escapeMd(decision.timing)}`);
+  if (decision.recheck_hint) lines.push(`🔁 *Re-check:* ${escapeMd(decision.recheck_hint)}`);
   if (decision.risk_flags && decision.risk_flags.length) {
     lines.push('⚠️ *Risks:*');
     for (const r of decision.risk_flags) lines.push(`• ${escapeMd(r)}`);
@@ -162,7 +170,7 @@ function formatReply(decision, { district, crop, action, stale }) {
 }
 
 module.exports = {
-  resolveDistrict, extractCrop, parseAction, parseLanguage, formatReply, normalize, WELCOME, CROP_HEALTH_INTRO,
+  resolveDistrict, extractCrop, parseAction, parseLanguage, formatReply, normalize, WELCOME, CROP_HEALTH_INTRO, FARMING_PLAN_INTRO,
   ACTION_KEYBOARD, CROP_KEYBOARD, DISTRICT_OFFER_KEYBOARD, LANGUAGE_KEYBOARD,
   SUPPORTED_ACTIONS, LANGUAGES,
 };

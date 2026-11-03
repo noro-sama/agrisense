@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Livestock plan — Agrisense</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="wordmark" href="/">Agrisense</a>
+  <a class="link" href="/check.html">Plant check</a>
+  <a class="link" href="/plan.html">Farming plan</a>
+  <a class="link" href="/livestock-plan.html">Livestock plan</a>
+  <a class="link" href="/learn.html">Learn</a>
+  <a class="btn-telegram" href="https://t.me/agrisense_zed_bot">Telegram bot</a>
+</div></nav>
+<main class="plan-page"><div class="wrap">
+  <h1>Livestock plan</h1>
+  <p class="standfirst">Housing, feed, health, and market timing for your animals — tuned to your district, the season, and this week's weather. Includes a visual housing guide.</p>
+
+  <form id="plan-form" class="form no-print">
+    <label>Species
+      <select name="species" required>
+        <option value="goats">Goats</option>
+        <option value="chickens">Chickens</option>
+        <option value="cattle">Cattle</option>
+      </select>
+    </label>
+    <label>Breed / type
+      <input name="breed" placeholder="e.g. local, Boer, village chicken" value="local">
+    </label>
+    <label>Herd / flock size (head)
+      <input name="herdSize" type="number" min="1" step="1" value="10" required>
+    </label>
+    <label>District
+      <input name="district" placeholder="e.g. Choma" required>
+    </label>
+    <label>Housing
+      <select name="housing">
+        <option value="none yet">None yet</option>
+        <option value="traditional kraal">Traditional kraal</option>
+        <option value="timber shelter with thatch">Timber shelter with thatch</option>
+        <option value="brick housing with iron roof">Brick housing with iron roof</option>
+      </select>
+    </label>
+    <label>Main feed
+      <select name="feed">
+        <option value="grazing">Grazing / free range</option>
+        <option value="grazing plus crop residue">Grazing + crop residue</option>
+        <option value="commercial feed">Commercial feed</option>
+      </select>
+    </label>
+    <label>Water source
+      <select name="water">
+        <option value="borehole nearby">Borehole nearby</option>
+        <option value="well nearby">Well nearby</option>
+        <option value="river or stream">River / stream</option>
+        <option value="piped water">Piped water</option>
+        <option value="distant source">Distant source</option>
+      </select>
+    </label>
+    <label>Purpose
+      <select name="purpose">
+        <option value="mixed">Mixed</option>
+        <option value="meat">Meat</option>
+        <option value="milk">Milk</option>
+        <option value="eggs">Eggs</option>
+        <option value="draught">Draught</option>
+      </select>
+    </label>
+    <label>Language
+      <select name="language">
+        <option value="english">English</option>
+        <option value="bemba">Bemba</option>
+        <option value="nyanja">Nyanja</option>
+        <option value="tonga">Tonga</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="includeImage" checked> Include visual housing guide</label>
+    <button type="submit">Build my plan</button>
+  </form>
+
+  <p id="plan-status" class="status no-print"></p>
+  <div id="plan-output"></div>
+  <div id="plan-actions" class="no-print" style="display:none">
+    <button id="print-btn" type="button">Print / save PDF</button>
+    <label>Language
+      <select id="relang">
+        <option value="english">English</option>
+        <option value="bemba">Bemba</option>
+        <option value="nyanja">Nyanja</option>
+        <option value="tonga">Tonga</option>
+      </select>
+    </label>
+  </div>
+</div></main>
+<script>
+const SECTIONS = [
+  ['housing', '🏠 Housing & Shelter'],
+  ['feeding', '🌾 Feeding & Water'],
+  ['health', '💉 Health & Vaccination'],
+  ['breeding', '🐣 Breeding & Lifecycle'],
+  ['risks', '⚠️ Critical Risks & Mitigation'],
+  ['market', '💰 Harvest & Market Tips'],
+];
+let planEn = null, meta = null, planImage = null, imageNote = '';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function render(plan) {
+  const out = document.getElementById('plan-output');
+  const visual = planImage
+    ? `<section><h3>🖼️ Visual Guide</h3><img src="${planImage.dataUrl}" alt="${esc(planImage.caption)}" style="max-width:100%;border-radius:8px"><p>${esc(planImage.caption)}</p></section>`
+    : (imageNote ? `<section><h3>🖼️ Visual Guide</h3><p>${esc(imageNote)}</p></section>` : '');
+  out.innerHTML = `<h2 class="plan-title">🐄 LIVESTOCK PLAN: ${esc(meta.species)} (${esc(meta.breed)}) — ${esc(meta.district)} — ${esc(meta.herdSize)} head</h2>` +
+    SECTIONS.map(([key, heading]) =>
+      `<section><h3>${heading}</h3><ul>${(plan[key] || []).map((b) => `<li>${esc(b)}</li>`).join('')}</ul></section>`
+    ).join('') + visual;
+  document.getElementById('plan-actions').style.display = 'block';
+}
+
+const STAGES = ['Drafting your timeline…', 'Checking risks…', 'Polishing the plan…', 'Drawing the visual guide…'];
+document.getElementById('plan-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  body.includeImage = fd.get('includeImage') === 'on';
+  document.getElementById('relang').value = body.language;
+  document.getElementById('plan-output').innerHTML = '';
+  document.getElementById('plan-actions').style.display = 'none';
+  const status = document.getElementById('plan-status');
+  let i = 0;
+  status.textContent = STAGES[0];
+  const tick = setInterval(() => { i = Math.min(i + 1, STAGES.length - 1); status.textContent = STAGES[i]; }, 20000);
+  try {
+    const res = await fetch('/api/livestock-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Plan failed');
+    planEn = data.planEn; meta = data.meta; planImage = data.image; imageNote = data.imageNote || '';
+    render(data.plan);
+    status.textContent = '';
+  } catch (err) {
+    status.textContent = `Sorry: ${err.message} Please try again.`;
+  } finally {
+    clearInterval(tick);
+  }
+});
+
+document.getElementById('relang').addEventListener('change', async (e) => {
+  if (!planEn) return;
+  const status = document.getElementById('plan-status');
+  status.textContent = 'Translating…';
+  try {
+    const res = await fetch('/api/livestock-plan/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ planEn, meta, language: e.target.value }) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Translation failed');
+    if (e.target.value !== 'english' && data.plan.image_caption) planImage = planImage && { ...planImage, caption: data.plan.image_caption };
+    if (e.target.value === 'english' && planEn.image_caption) planImage = planImage && { ...planImage, caption: planEn.image_caption };
+    render(data.plan);
+    status.textContent = '';
+  } catch (err) {
+    status.textContent = `Sorry: ${err.message} Please try again.`;
+  }
+});
+
+document.getElementById('print-btn').addEventListener('click', () => window.print());
+</script>
+</body>
+</html>

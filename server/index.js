@@ -4,14 +4,16 @@ const TelegramBot = require('node-telegram-bot-api');
 const logger = require('./utils/logger');
 const { getDailyForecast } = require('./services/forecastService');
 const { getSoils, getDistricts } = require('./services/agriRigoService');
-const { computeFeatures, computeFertiliserFeatures, computeTillageFeatures } = require('./services/featureService');
+const { computeFeatures, computeFertiliserFeatures, computeTillageFeatures, computeObservedFeatures } = require('./services/featureService');
+const { getRecentRain } = require('./services/historyService');
 const { getPlantingDecision, translateDecision, analyzeCropImage } = require('./services/aiService');
 const { pickPhotoId, fetchPhotoBase64 } = require('./services/cropHealthService');
 const { getState, updateState, resetState } = require('./services/conversationService');
 const { buildPlan, translatePlan } = require('./services/farmingPlanService');
+const { buildLivestockPlan, translateLivestockPlan } = require('./services/livestockPlanService');
 const {
   resolveDistrict, extractCrop, parseAction, parseLanguage, formatReply, normalize,
-  WELCOME, CROP_HEALTH_INTRO, ACTION_KEYBOARD, CROP_KEYBOARD, DISTRICT_OFFER_KEYBOARD, LANGUAGE_KEYBOARD,
+  WELCOME, CROP_HEALTH_INTRO, FARMING_PLAN_INTRO, ACTION_KEYBOARD, CROP_KEYBOARD, DISTRICT_OFFER_KEYBOARD, LANGUAGE_KEYBOARD,
   SUPPORTED_ACTIONS, LANGUAGES,
 } = require('./services/telegramService');
 
@@ -41,6 +43,27 @@ app.post('/api/plan/translate', async (req, res) => {
     res.json({ ok: true, plan: await translatePlan(planEn, meta, language) });
   } catch (err) {
     logger.warn('web', 'plan translation failed', { error: err.message });
+    res.status(err.status || 502).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/livestock-plan', async (req, res) => {
+  try {
+    res.json({ ok: true, ...(await buildLivestockPlan(req.body || {})) });
+  } catch (err) {
+    logger.warn('web', 'livestock plan failed', { error: err.message });
+    res.status(err.status || 502).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/livestock-plan/translate', async (req, res) => {
+  try {
+    const { planEn, meta, language } = req.body || {};
+    if (!planEn || !meta) throw Object.assign(new Error('planEn and meta are required.'), { status: 400 });
+    const { plan } = await translateLivestockPlan(planEn, meta, language);
+    res.json({ ok: true, plan });
+  } catch (err) {
+    logger.warn('web', 'livestock plan translation failed', { error: err.message });
     res.status(err.status || 502).json({ ok: false, error: err.message });
   }
 });
@@ -100,7 +123,22 @@ async function buildAdvisory(state) {
     };
   }
   sources.push(...forecast.sources_used);
-  const features = computeFeaturesFor(action, forecast.daily, crop);
+  let features = computeFeaturesFor(action, forecast.daily, crop);
+
+  let observedNote = '';
+  try {
+    const history = await getRecentRain(district.lat, district.lon);
+    sources.push(...history.sources_used);
+    const obs = computeObservedFeatures(history.daily, crop);
+    features = { ...features, ...obs };
+    observedNote = obs.recently_wet
+      ? `Recent rain: ${obs.observed_rain_last_5d_mm}mm in last 5 days (observed) — topsoil may still be moist`
+      : `Recent rain: ${obs.observed_rain_last_5d_mm}mm in last 5 days (observed)`;
+    if (history.stale) observedNote += ' (stale cache)';
+  } catch (err) {
+    logger.warn('telegram', 'recent rain unavailable, continuing without', { error: err.message });
+    observedNote = 'recent rainfall unknown';
+  }
 
   let soilData = '';
   try {
@@ -117,7 +155,7 @@ async function buildAdvisory(state) {
     ? `Last season drought: ${district.drought_severity_2023_24} (historical, 2023/24)`
     : '';
 
-  const decision = await getPlantingDecision({ action, features, cropKnowledge: '', soilData, droughtNote, sources_used: sources });
+  const decision = await getPlantingDecision({ action, features, cropKnowledge: '', soilData, droughtNote, observedNote, sources_used: sources });
   const shown = await translateDecision(decision, { district: district.name, crop, action }, state.language);
   return {
     text: formatReply(shown, { district, crop, action, stale: forecast.stale }),
@@ -179,6 +217,9 @@ async function handleText(chatId, text) {
   if (action === 'crop-health') {
     updateState(chatId, { action });
     return { text: CROP_HEALTH_INTRO, options: { parse_mode: 'Markdown' } };
+  }
+  if (action === 'farming-plan') {
+    return { text: FARMING_PLAN_INTRO, options: { parse_mode: 'Markdown' } };
   }
   if (action) updateState(chatId, { action });
   const cropM = extractCrop(text);

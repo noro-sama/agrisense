@@ -43,17 +43,30 @@ FERTILISER RULES: verdict GO only when rain is expected soon without heavy downp
 TILLAGE RULES: verdict GO only for a workable dry window. If heavy_rain_risk_days > 0, verdict MUST be WAIT (wet fields turn to mud under the hoe).`;
   }
   return `${common}
-PLANTING RULES: if has_effective_rain_in_window is false, verdict MUST be WAIT and timing MUST be exactly "${NO_WINDOW}". If heavy_rain_risk_days > 0 and waterlogging_sensitive is true, include an explicit flood/waterlogging caution, but do not block planting on it.`;
+PLANTING RULES: if has_effective_rain_in_window is false, verdict MUST be WAIT and timing MUST be exactly "${NO_WINDOW}". If heavy_rain_risk_days > 0 and waterlogging_sensitive is true, include an explicit flood/waterlogging caution, but do not block planting on it. If recently_wet is true, mention the recent rain in explanation and advise checking moisture at seed depth before waiting out the dry forecast.`;
 }
 
-function buildUserPrompt(action, { features, cropKnowledge, soilData, droughtNote }) {
+function buildUserPrompt(action, { features, cropKnowledge, soilData, droughtNote, observedNote }) {
   return `Action: ${action}
 Features (computed server-side from the forecast):
 ${JSON.stringify(features)}
 
 Crop knowledge: ${cropKnowledge || 'none supplied'}
 Soil: ${soilData || 'none supplied'}
-${droughtNote || ''}`;
+${droughtNote || ''}
+${observedNote || ''}`;
+}
+
+// Rule-based "wait until" trigger. WAITs name their loop-closer; GO verdicts
+// and non-plant actions get none. Wet soil adds the hand-check escape hatch.
+function buildRecheckHint(action, features) {
+  if (action !== 'plant' || !features || features.has_effective_rain_in_window) return null;
+  const crop = features.crop || 'crop';
+  const need = features.min_effective_rain_mm ?? 15;
+  if (features.recently_wet) {
+    return `Soil may still be moist from recent rain (${features.observed_rain_last_5d_mm}mm in the last 5 days). If the soil is moist at seed depth, you can plant; otherwise re-check when the forecast shows ≥${need}mm of rain within 3 days for ${crop}.`;
+  }
+  return `Re-check when the forecast shows ≥${need}mm of rain within 3 days for ${crop}.`;
 }
 
 const RETRY_INSTRUCTION = 'Reply with ONLY the JSON object matching this shape: {"verdict":"GO|WAIT","confidence":"high|medium|low","explanation":"...","timing":"...","cautions":[...]}. No other text.';
@@ -117,7 +130,7 @@ function isValidModelShape(o) {
 function toDecision(parsed, action, input, sourcesUsed) {
   const context_notes = [];
   if (input.droughtNote) context_notes.push(input.droughtNote);
-  if (input.soilData) context_notes.push(`Soil: ${input.soilData}`);
+  if (input.observedNote) context_notes.push(input.observedNote);
   return {
     recommendation: parsed.verdict === 'GO' ? ACTION_LABELS[action] : 'WAIT',
     confidence: parsed.confidence,
@@ -125,6 +138,7 @@ function toDecision(parsed, action, input, sourcesUsed) {
     timing: parsed.timing,
     risk_flags: [...parsed.cautions],
     context_notes,
+    recheck_hint: buildRecheckHint(action, input.features),
     sources_used: sourcesUsed,
   };
 }
@@ -171,7 +185,7 @@ function validateAndOverride(decision, features, action) {
 function baseNotes(input, note) {
   const notes = [];
   if (input.droughtNote) notes.push(input.droughtNote);
-  if (input.soilData) notes.push(`Soil: ${input.soilData}`);
+  if (input.observedNote) notes.push(input.observedNote);
   if (note) notes.push(note);
   return notes;
 }
@@ -179,6 +193,7 @@ function baseNotes(input, note) {
 function ruleBasedAdvice(input, sourcesUsed, note) {
   const { action, features: f } = input;
   const context_notes = baseNotes(input, note);
+  const recheck_hint = buildRecheckHint(action, f);
   if (action === 'fertiliser') {
     const risk_flags = [];
     if (f.heavy_rain_in_3d) risk_flags.push('heavy rain within 3 days would wash fertiliser away');
@@ -190,14 +205,14 @@ function ruleBasedAdvice(input, sourcesUsed, note) {
           ? 'Heavy rain is coming within 3 days; it would wash fertiliser away.'
           : 'The soil is too dry; fertiliser now would burn the roots.',
         timing: f.heavy_rain_in_3d ? 'wait until heavy rain passes' : 'wait for rain, then apply',
-        risk_flags, context_notes, sources_used: sourcesUsed,
+        risk_flags, context_notes, recheck_hint, sources_used: sourcesUsed,
       };
     }
     return {
       recommendation: 'APPLY', confidence: 'low',
       reason_plain: `Rain expected around ${f.first_useful_rain_date}; a good window to apply fertiliser.`,
       timing: f.first_useful_rain_date,
-      risk_flags, context_notes, sources_used: sourcesUsed,
+      risk_flags, context_notes, recheck_hint, sources_used: sourcesUsed,
     };
   }
   if (action === 'till') {
@@ -207,14 +222,14 @@ function ruleBasedAdvice(input, sourcesUsed, note) {
         reason_plain: 'Heavy rain in the window would turn tilled fields to mud.',
         timing: 'wait for a dry window',
         risk_flags: [`heavy rain on ${f.heavy_rain_risk_days} day(s)`],
-        context_notes, sources_used: sourcesUsed,
+        context_notes, recheck_hint, sources_used: sourcesUsed,
       };
     }
     return {
       recommendation: 'TILL', confidence: 'low',
       reason_plain: `Dry workable window through ${f.window_through}.`,
       timing: `now through ${f.window_through}`,
-      risk_flags: [], context_notes, sources_used: sourcesUsed,
+      risk_flags: [], context_notes, recheck_hint, sources_used: sourcesUsed,
     };
   }
   const risk_flags = [];
@@ -226,18 +241,18 @@ function ruleBasedAdvice(input, sourcesUsed, note) {
       recommendation: 'WAIT', confidence: 'low',
       reason_plain: `No effective rain for ${f.crop} in the current forecast; dry start of ${f.dry_streak_days} day(s).`,
       timing: NO_WINDOW,
-      risk_flags, context_notes, sources_used: sourcesUsed,
+      risk_flags, context_notes, recheck_hint, sources_used: sourcesUsed,
     };
   }
   return {
     recommendation: 'PLANT', confidence: 'low',
     reason_plain: `Effective rain for ${f.crop} expected around ${f.first_effective_rain_date}; ok to plant now ahead of the rains.`,
     timing: f.first_effective_rain_date,
-    risk_flags, context_notes, sources_used: sourcesUsed,
+    risk_flags, context_notes, recheck_hint, sources_used: sourcesUsed,
   };
 }
 
-// Input: { action, features, cropKnowledge, soilData, droughtNote, sources_used }
+// Input: { action, features, cropKnowledge, soilData, droughtNote, observedNote, sources_used }
 async function getPlantingDecision(input) {
   const action = input.action || 'plant';
   if (!ACTION_LABELS[action]) throw new Error(`aiService: unknown action '${input.action}'`);
@@ -373,8 +388,9 @@ const TRANSLATION_SCHEMA = {
     timing: { type: 'string' },
     cautions: { type: 'array', items: { type: 'string' } },
     notes: { type: 'array', items: { type: 'string' } },
+    recheck: { type: 'string' },
   },
-  required: ['explanation', 'timing', 'cautions', 'notes'],
+  required: ['explanation', 'timing', 'cautions', 'notes', 'recheck'],
 };
 const LANGUAGE_NAMES = { bemba: 'Bemba (Chibemba)', nyanja: 'Nyanja (Chinyanja)', tonga: 'Tonga (Chitonga)', english: 'English' };
 
@@ -385,19 +401,20 @@ async function translateDecision(decision, context, language) {
   if (!language || language === 'english') return decision;
   const langName = LANGUAGE_NAMES[language] || language;
   const system = `You translate Zambian farming advice into ${langName}. RULES: preserve every number, date, rainfall figure, and place or crop name exactly; plain farmer-friendly ${langName}; reply under the given JSON schema.`;
-  const user = `Translate this ${context.action || 'planting'} advice for ${context.crop} in ${context.district}:\n${JSON.stringify({ explanation: decision.reason_plain, timing: decision.timing, cautions: decision.risk_flags, notes: decision.context_notes })}`;
+  const user = `Translate this ${context.action || 'planting'} advice for ${context.crop} in ${context.district}:\n${JSON.stringify({ explanation: decision.reason_plain, timing: decision.timing, cautions: decision.risk_flags, notes: decision.context_notes, recheck: decision.recheck_hint || '' })}`;
   try {
     const { text: raw } = await callMetaModel(system, user, TRANSLATION_SCHEMA);
     const parsed = parseModelJson(raw);
     const ok = parsed && typeof parsed.explanation === 'string' && parsed.explanation.length > 0
       && typeof parsed.timing === 'string' && parsed.timing.length > 0
-      && Array.isArray(parsed.cautions) && Array.isArray(parsed.notes);
+      && Array.isArray(parsed.cautions) && Array.isArray(parsed.notes)
+      && typeof parsed.recheck === 'string';
     if (!ok) throw new Error('schema mismatch');
-    return { ...decision, reason_plain: parsed.explanation, timing: parsed.timing, risk_flags: parsed.cautions, context_notes: parsed.notes };
+    return { ...decision, reason_plain: parsed.explanation, timing: parsed.timing, risk_flags: parsed.cautions, context_notes: parsed.notes, recheck_hint: parsed.recheck || null };
   } catch (err) {
     logger.warn('ai', 'translation failed, keeping English', { error: err.message, language });
     return { ...decision, context_notes: [...decision.context_notes, 'Translation unavailable, showing English'] };
   }
 }
 
-module.exports = { getPlantingDecision, translateDecision, analyzeCropImage, runStructured, validateAndOverride, ruleBasedAdvice, MODEL_SCHEMA, ACTION_LABELS };
+module.exports = { getPlantingDecision, translateDecision, analyzeCropImage, runStructured, validateAndOverride, ruleBasedAdvice, buildRecheckHint, buildUserPrompt, MODEL_SCHEMA, ACTION_LABELS };

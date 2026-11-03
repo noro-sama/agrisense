@@ -1,9 +1,5 @@
 <a name="readme-top"></a>
 
-<p align="center">
-  <img src="images/agrisense%20img.png" alt="Agrisense logo" width="220">
-</p>
-
 <h1 align="center">Agrisense</h1>
 
 # 📗 Table of Contents
@@ -35,7 +31,7 @@
 
 **Agrisense** is an agricultural decision engine built for the Meta Global AI Developer Hackathon. Farmers message it on Telegram with their district and crop; it fetches the live 7-day forecast and provincial soils, computes agronomic features server-side, and asks Muse Spark to reason only over those numbers. The model never sees raw API payloads and never invents figures — every output is validated against its input before it reaches the farmer, who always makes the final call.
 
-The problem is personal: planting or fertilising in the wrong window drowns seedlings, stunts growth, or burns roots — a mistake this project has watched happen firsthand.
+The problem is personal: planting in the wrong window drowns seedlings, stunts growth, and not knowing how to manage dry spells when fertilising can burn roots — a mistake this project has watched happen firsthand.
 
 ## 🛠 Built With <a name="built-with"></a>
 
@@ -46,6 +42,15 @@ The problem is personal: planting or fertilising in the wrong window drowns seed
   <ul>
     <li>Telegram bot (<a href="https://github.com/yagop/node-telegram-bot-api">node-telegram-bot-api</a>, long polling)</li>
     <li>Plain HTML/CSS/JS web app (no framework)</li>
+  </ul>
+</details>
+
+<details>
+  <summary>AI models</summary>
+  <ul>
+    <li>Muse Spark series (<a href="https://api.meta.ai">Meta Model API</a> — advisories, vision, translation, plans)</li>
+    <li>Muse code</li>
+    <li>Muse Image, for image generation</li>
   </ul>
 </details>
 
@@ -64,14 +69,14 @@ The problem is personal: planting or fertilising in the wrong window drowns seed
 - **📷 Crop health from photos** — disease/pest verdicts (HEALTHY/SUSPECT) with action steps.
 - **Local languages** — every answer re-renderable in Bemba, Nyanja, Tonga, or English.
 - **Season farming plans** — 3-agent pipeline (Agronomist → Risk Assessor → Editor) on the web app, printable.
-- **Learn page** — plain-language guides: El Niño/La Niña, dry spells, fertiliser timing.
+- **Learn page** — plain-language guides: El Niño/La Niña, dry spells, per-crop dry-spell management, fertiliser timing.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🚀 Live Demo <a name="live-demo"></a>
 
 - [Telegram bot](https://t.me/agrisense_zed_bot) — chat with Agrisense now.
-- [Live web app](#) — _URL coming on deploy._
+- [Live web app](https://agrisense-f5ky.onrender.com) - go and make a crop or livestock farming plan
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -92,7 +97,7 @@ In order to run this project you need:
 Clone this repository to your desired folder:
 
 ```sh
-git clone https://github.com/<your-handle>/agrisense.git
+git clone https://github.com/noro-sama/agrisense.git
 cd agrisense
 ```
 
@@ -117,7 +122,7 @@ npm start
 
 - Web app: `http://localhost:3000` (plan form, learn page)
 - Health: `http://localhost:3000/api/health`
-- Telegram: message your bot (`/start`, then tap Plant or 📷 Crop health)
+- Telegram: message your bot (`/start`, then tap Plant, 📷 Crop health, or Farming plan)
 
 ### Run tests
 
@@ -145,8 +150,6 @@ Set the same env vars in production. Note: Telegram uses long polling, so run ex
 
 ## 🌍 Impact <a name="impact"></a>
 
-> _Placeholder — to be filled with field results._
-
 Target: smallholder farmers across ~40 Zambian agricultural districts, advised in 4 languages, grounded in live AgriRigo weather and soils. Success looks like fewer mistimed plantings, earlier disease catches from photos, and advice farmers can read in their own language.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -155,17 +158,18 @@ Target: smallholder farmers across ~40 Zambian agricultural districts, advised i
 
 👤 **Author**
 
-- GitHub: [@your-handle](https://github.com/your-handle)
+- GitHub: [@noro-sama](https://github.com/noro-sama)
+- LinkedIn: [@tracy-muso](https://linkedin.com/in/tracy-muso)
+- X: [@tracy-muso](https://x.com/tracy-muso)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🔭 Future Features <a name="future-features"></a>
 
-- [ ] **Backtest report** — hindcast accuracy (effective-rain precision, false-WAIT rate) over Oct 2024–Mar 2025.
-- [ ] **What-if season simulator** — re-run plans under shifted rainfall scenarios.
+- [ ] **Agrisense chatbot** — a chatbot that converses only on agriculture-related topics.
 - [ ] **Voice notes** — spoken questions and answers for low-literacy farmers.
 - [ ] **Fertiliser & tillage advisories** — engine built, re-enable behind the action gate.
-- [ ] **Premium plans** — paywalled deep features (e.g., unlimited season plans).
+- [ ] **Whatsapp Integration** — once funding is available, we will use whatsapp, one of the most widely used messaging platforms.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -173,7 +177,7 @@ Target: smallholder farmers across ~40 Zambian agricultural districts, advised i
 
 Contributions, issues, and feature requests are welcome!
 
-Feel free to check the [issues page](../../issues/).
+Feel free to check the [issues page](https://github.com/noro-sama/agrisense/issues/).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -186,7 +190,7 @@ If you like this project, give it a star — and if you farm in Zambia, try the 
 ## 🙏 Acknowledgements <a name="acknowledgements"></a>
 
 - [AgriRigo](https://rigo.agririgo.com) for the open agricultural data engine (ZamStats, FAOSTAT, ISRIC SoilGrids, CHIRPS sources underneath).
-- Meta and the Global AI Developer Hackathon for the Muse Spark platform.
+- Meta, Cerebral Valley for hosting the Global AI Developer Hackathon.
 - Zambia's extension officers — the human layer no bot replaces.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

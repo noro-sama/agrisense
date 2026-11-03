@@ -141,4 +141,74 @@ function computeTillageFeatures(daily) {
   };
 }
 
-module.exports = { computeFeatures, computeFertiliserFeatures, computeTillageFeatures, CROP_PROFILES, NO_WINDOW };
+// Livestock window: heat kills poultry and cuts milk, heavy rain floods
+// housing (foot rot, coccidiosis), long dry spells stress water points.
+function computeLivestockFeatures(daily) {
+  const n = assertDaily(daily);
+  const rain = daily.precipitation_sum;
+  const tmax = daily.temperature_2m_max;
+
+  let rainTotal = 0;
+  for (let i = 0; i < n; i++) rainTotal += rain[i];
+
+  let heavy = 0;
+  let heat = 0;
+  let dryDays = 0;
+  for (let i = 0; i < n; i++) {
+    if (rain[i] >= HEAVY_RAIN_MM) heavy++;
+    if (tmax[i] >= HEAT_STRESS_C) heat++;
+    if (rain[i] === 0) dryDays++;
+  }
+
+  return {
+    rain_window_total_mm: round1(rainTotal),
+    heavy_rain_days: heavy,
+    heat_stress_days: heat,
+    dry_days_in_window: dryDays,
+    window_through: daily.time[n - 1],
+  };
+}
+
+// Observed-rain proxy for topsoil moisture. past: { time[], precipitation_sum[] }
+// with the most recent complete day last (historyService drops partial today).
+// Uses the last 5 days; "recently wet" means a crop-effective amount fell and
+// it rained within the last 3 days. Thresholds are starting values.
+const RECENT_WET_DAYS = 3;
+const OBSERVED_WINDOW = 5;
+
+function computeObservedFeatures(past, crop) {
+  if (!past || typeof past !== 'object') throw new Error('featureService: past payload must be an object');
+  for (const k of ['time', 'precipitation_sum']) {
+    if (!Array.isArray(past[k])) throw new Error(`featureService: past.${k} must be an array`);
+  }
+  const n = past.time.length;
+  if (n === 0) throw new Error('featureService: past arrays must not be empty');
+  if (past.precipitation_sum.length !== n) {
+    throw new Error('featureService: past arrays must all be the same length');
+  }
+  const key = String(crop || '').toLowerCase().trim();
+  const profile = CROP_PROFILES[key];
+  if (!profile) throw new Error(`featureService: unknown crop '${crop}'`);
+
+  const rain = past.precipitation_sum.slice(-OBSERVED_WINDOW);
+  let total = 0;
+  let days = 0;
+  for (const mm of rain) {
+    total += mm;
+    if (mm > 0) days++;
+  }
+  let since = null;
+  for (let i = rain.length - 1; i >= 0; i--) {
+    if (rain[i] > 0) { since = rain.length - 1 - i; break; }
+  }
+
+  return {
+    observed_rain_last_5d_mm: round1(total),
+    observed_rain_days: days,
+    days_since_rain: since,
+    recently_wet: round1(total) >= profile.minEffectiveRainMm && since !== null && since <= RECENT_WET_DAYS,
+    observed_days: rain.length,
+  };
+}
+
+module.exports = { computeFeatures, computeFertiliserFeatures, computeTillageFeatures, computeLivestockFeatures, computeObservedFeatures, CROP_PROFILES, NO_WINDOW };
